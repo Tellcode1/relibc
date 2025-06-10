@@ -1,8 +1,14 @@
 # Generates an arc tangent table with given number of entries and outputs it to a file .cordic_atan_table.h as a C header.
 # The header contains a define _CORDIC_ATAN_TABLE_ENTRIES with the number of entries generated and the table size equal to it.
-# The table is named _cordic_atan_table and is of type long double
+# The table is named _cordic_atan_table and is of type long double. The cordic gain is named _CORDIC_GAIN and is a define
 
 import mpmath
+
+def get_cordic_gain(n):
+	K = mpmath.mpf(1)
+	for i in range(n):
+		K *= 1 / mpmath.sqrt(1 + mpmath.mpf(2) ** (-2 * i))
+	return K
 
 def main():
 	num_entries = int(input("Enter the number of entries you would like to generate (Typically 64): "));
@@ -19,10 +25,11 @@ def main():
 		f.write("\tMODIFY THE SCRIPT. DO NOT MODIFY GENERATED FILE.\n*/\n");
 		f.write("#include \"float.h\"\n");
 		f.write(f"#define _CORDIC_ATAN_TABLE_ENTRIES {num_entries}\n");
+		f.write(f"#define _CORDIC_GAIN {get_cordic_gain(num_entries)}L\n");
 
 		# We don't need to compute the arc tangent in parallel, it's trivial
 		atan_table = [mpmath.atan(2**-i) for i in range(num_entries)]
-		f.write("ldouble_t _cordic_atan_table[_CORDIC_ATAN_TABLE_ENTRIES] = {\n");
+		f.write("static const ldouble_t _cordic_atan_table[_CORDIC_ATAN_TABLE_ENTRIES] = {\n");
 
 		for entry in atan_table:
 			# write with 48 digits of precision

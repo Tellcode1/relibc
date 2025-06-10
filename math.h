@@ -40,6 +40,14 @@
 #  define RE_LIKELY(likely_to_return_true)
 #endif
 
+#if defined(__GNUC__) && ((__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1))
+#  define RE_RESTRICT __restrict
+#elif defined(_MSC_VER) && _MSC_VER >= 1400
+#  define RE_RESTRICT __restrict
+#else
+#  define RE_RESTRICT
+#endif
+
 #define M_E 2.718281828459045       // The value of euler's number
 #define M_LOG2E 1.442695040889      // The log base 2 of e
 #define M_LOG10E 0.43429448190325   // The log base 10 of e
@@ -75,12 +83,6 @@
 #define M_EGAMMAl 0.57721566490153286060651209008240L
 #define M_PHIl 1.6180339887498948482045868343656L
 
-#define FP_INFINITE 1
-#define FP_NAN 2
-#define FP_NORMAL 3
-#define FP_SUBNORMAL 4
-#define FP_ZERO 5
-
 #ifdef __GNUC__
 #  define INFINITY (__builtin_inff())
 #  define NAN (__builtin_nanf(""))
@@ -95,8 +97,9 @@
 
 /**
  * These incorrectly return false with optimizations enabled (-ffast-math)
- * However, isnan(), isinf() and the like aren't to be used when optimizations are enabled
- * Because fast-math essentially says: "Infinities and NANs may not occur, optimize as you wish."
+ * However, isnan(), isinf() and the like aren't to be used when optimizations
+ * are enabled Because fast-math essentially says: "Infinities and NANs may not
+ * occur, optimize as you wish."
  */
 #ifndef __FAST_MATH__
 #  define isnan(x) ((x) != (x))
@@ -114,6 +117,14 @@
 #  define isposinf(x) _fast_math_is_enabled_
 #  define isneginf(x) _fast_math_is_enabled_
 #endif
+
+#define FP_INFINITE 1
+#define FP_NAN 2
+#define FP_NORMAL 3
+#define FP_SUBNORMAL 4
+#define FP_ZERO 5
+
+#define fpclassify(x) (x == RE_TYPECAST(0.0, x) ? FP_ZERO : (isinf(x) ? FP_INFINITE : (isnan(x) ? FP_NAN : (isnormal(x) ? FP_NORMAL : FP_SUBNORMAL))))
 
 #define isunordered(x, y) (isnan(x) || isnan(y))
 #define isordered(x, y) (!isnan(x) && !isnan(y))
@@ -134,10 +145,10 @@ RE_HEADER_FN RE_CONST_FN int _re_signbitf(float_t x) { union { float f; unsigned
 #pragma clang diagnostic push
 
 /**
- * There are some static asserts in this header that expand to really long checks.
- * Clang sees these as VLA's but notices that their size may be deduced at compile time
- * Now, even though clang is correct here, compilers don't need to compute the size and so its
- * a GCC extension. But we need the assertations.
+ * There are some static asserts in this header that expand to really long
+ * checks. Clang sees these as VLA's but notices that their size may be deduced
+ * at compile time Now, even though clang is correct here, compilers don't need
+ * to compute the size and so its a GCC extension. But we need the assertations.
  */
 #pragma clang diagnostic ignored "-Wgnu-folding-constant"
 
@@ -148,23 +159,33 @@ RE_STATIC_ASSERT(invalid_platform_positive_one_must_have_inactive_sign_bit, sign
 
 #pragma clang diagnostic pop
 
-#define isgreater(x, y) ((x - RE_TYPECAST(y, x)) > RE_TYPECAST(0, x))
-#define isgreaterequal(x, y) ((x - RE_TYPECAST(y, x)) >= RE_TYPECAST(0, x))
-#define isless(x, y) ((x - RE_TYPECAST(y, x)) < RE_TYPECAST(0, x))
-#define islessequal(x, y) ((x - RE_TYPECAST(y, x)) <= RE_TYPECAST(0, x))
-#define islessgreater(x, y) (x != RE_TYPECAST(y, x)) // if it can only be lesser or greater, then it must not be equal
-
-extern RE_CONST_FN double_t    fmax(double_t x, double_t y);
-extern RE_CONST_FN float_t     fmaxf(float_t x, float_t y);
-extern RE_CONST_FN long double fmaxl(long double x, long double y);
-
 #define signf_fast(x) ((*(const unsigned int*)&(x) & 0x80000000u) ? -1.0f : 1.0f)
 #define sign_fast(x) ((*(const unsigned long long*)&(x) & 0x8000000000000000ULL) ? -1.0 : 1.0)
 
 // clang-format off
 RE_HEADER_FN RE_CONST_FN float_t copysignf(float_t x, float_t y) { return x * signf_fast(y); }
 RE_HEADER_FN RE_CONST_FN double_t copysign(double_t x, double_t y) { return x * sign_fast(y); }
-extern long double copysignl(long double x, long double y);
+extern ldouble_t copysignl(ldouble_t x, ldouble_t y);
+// clang-format on
+
+#define isgreater(x, y) ((x - RE_TYPECAST(y, x)) > RE_TYPECAST(0, x))
+#define isgreaterequal(x, y) ((x - RE_TYPECAST(y, x)) >= RE_TYPECAST(0, x))
+#define isless(x, y) ((x - RE_TYPECAST(y, x)) < RE_TYPECAST(0, x))
+#define islessequal(x, y) ((x - RE_TYPECAST(y, x)) <= RE_TYPECAST(0, x))
+#define islessgreater(x, y) (x != RE_TYPECAST(y, x)) // if it can only be lesser or greater, then it must not be equal
+
+// clang-format off
+#define RE_noop(x) (x)
+#define _RE_minmaxnancheck                                                                                                                                                                                                                                     \
+  if (RE_UNLIKELY(isnan(x))) return x; else if (RE_UNLIKELY(isnan(y))) return y;
+// that if statemetn 
+RE_HEADER_FN RE_CONST_FN double_t  fmax(double_t x, double_t y) {   _RE_minmaxnancheck;  return (x > y || x == y) ? x : y; }
+RE_HEADER_FN RE_CONST_FN float_t   fmaxf(float_t x, float_t y) {    _RE_minmaxnancheck;  return (x > y || x == y) ? x : y; }
+RE_HEADER_FN RE_CONST_FN ldouble_t fmaxl(ldouble_t x, ldouble_t y) { _RE_minmaxnancheck; return (x > y || x == y) ? x : y; }
+
+RE_HEADER_FN RE_CONST_FN double_t  fmin(double_t x, double_t y) {    _RE_minmaxnancheck; return (x < y || x == y) ? x : y; }
+RE_HEADER_FN RE_CONST_FN float_t   fminf(float_t x, float_t y) {     _RE_minmaxnancheck; return (x < y || x == y) ? x : y; }
+RE_HEADER_FN RE_CONST_FN ldouble_t fminl(ldouble_t x, ldouble_t y) { _RE_minmaxnancheck; return (x < y || x == y) ? x : y; }
 // clang-format on
 
 // clang-format off
@@ -187,12 +208,14 @@ extern RE_CONST_FN double_t  sin(double_t xrads);
 extern RE_CONST_FN float_t   sinf(float_t xrads);
 extern RE_CONST_FN ldouble_t sinl(ldouble_t xrads);
 
-/**
- * A Taylor series function to approximate arc tangent.
- * This isn't defined as atan() because we use a CORDIC based function (see: https://en.wikipedia.org/wiki/CORDIC)
- * and the function requires an arc tangent table to use. This function is only used to build that table.
- * The CORDIC function is faster, and I think more accurate so it's better to use that instead of this.
- */
-extern RE_CONST_FN double_t _re_atan(double_t xrads);
+extern RE_CONST_FN double_t  cos(double_t xrads);
+extern RE_CONST_FN float_t   cosf(float_t xrads);
+extern RE_CONST_FN ldouble_t cosl(ldouble_t xrads);
+
+extern RE_CONST_FN double_t  tan(double_t xrads);
+extern RE_CONST_FN float_t   tanf(float_t xrads);
+extern RE_CONST_FN ldouble_t tanl(ldouble_t xrads);
+
+extern void _re_cordic(double_t xrads, double_t* RE_RESTRICT o_sin, double_t* RE_RESTRICT o_cos);
 
 #endif //_RELIBC_MATH_H

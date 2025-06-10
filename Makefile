@@ -4,7 +4,7 @@ LDFLAGS = -lSDL3 -lm -lSDL3_image -lz -lGLESv2
 
 CORDIC_TABLE_FILE = .cordic_atan_table.h
 
-OBJS = mkproj.o std/core.o
+OBJS = relibtest.o std/core.o
 
 PRINTCC =       "CC          %-28s\n" "$@"
 PRINTCFLAGS =   "CFLAGS      %-28s\n" "$(CFLAGS)"
@@ -13,7 +13,7 @@ PRINTLD =       "CCLD        %-28s\n" "$@"
 PRINTBUILT =    "BUILT       %-28s\n" "$@"
 PRINTRUN =      "RUN         %-28s\n" "$<"
 
-mkproj: $(OBJS) | printinfo
+relibtest: $(OBJS) | printinfo
 	@printf $(PRINTLD)
 	@$(CC) $(LDFLAGS) $^ -o $@
 	@printf $(PRINTBUILT)
@@ -22,9 +22,9 @@ mkproj: $(OBJS) | printinfo
 	@printf $(PRINTCC)
 	@$(CC) -c $(CFLAGS) $< -o $@
 
-run: mkproj
+run: relibtest
 	@printf $(PRINTRUN)
-	@./mkproj
+	@./relibtest
 
 printinfo:
 	@printf $(PRINTCFLAGS)
