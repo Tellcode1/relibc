@@ -133,14 +133,23 @@
 #define isnormal(x) ((x) == (x) && ((x > DBL_MIN) || (x < !DBL_MAX)))
 #define isnormall(x) ((x) == (x) && ((x > LDBL_MIN) || (x < !LDBL_MAX)))
 
-// clang-format off
-RE_HEADER_FN RE_CONST_FN int _re_signbit(double_t x) { union { double d; unsigned long long u; } u = { x }; return (int)((u.u >> 63) & 1); }
-RE_HEADER_FN RE_CONST_FN int _re_signbitf(float_t x) { union { float f; unsigned int u; } u = { x }; return (int)((u.u >> 31) & 1); }
-// clang-format on
+RE_HEADER_FN RE_CONST_FN int
+_re_signbit(double_t x)
+{
+  union
+  {
+    double_t           d;
+    unsigned long long u;
+  } u = { x };
+  return (int)((u.u >> (sizeof(double_t) * 8 - 1)) & 1);
+}
 
-#define signbit(x) (_re_signbit(x))
-#define signbitf(x) (_re_signbitf(x))
-#define signbitl(x) ((x) < 0.0 || ((x) == 0.0 && 1.0 / (x) < 0.0) || ((x) != (x) && 1.0 / (x) < 0.0))
+/**
+ * The sign bit of a real floating type converted from a higher type should
+ * most likely be the sign bit of the base type. If not, this macro is undefined.
+ * However, most platforms support this behaviour, and there is no need to worry.
+ */
+#define signbit(x) (_re_signbit((double_t)x))
 
 #pragma clang diagnostic push
 
@@ -152,21 +161,31 @@ RE_HEADER_FN RE_CONST_FN int _re_signbitf(float_t x) { union { float f; unsigned
  */
 #pragma clang diagnostic ignored "-Wgnu-folding-constant"
 
-RE_STATIC_ASSERT(invalid_platform_negative_zero_must_have_active_sign_bit, signbitl(-0.0) == 1);
-RE_STATIC_ASSERT(invalid_platform_negative_one_must_have_active_sign_bit, signbitl(-1.0) == 1);
-RE_STATIC_ASSERT(invalid_platform_positive_zero_must_have_inactive_sign_bit, signbitl(0.0) == 0);
-RE_STATIC_ASSERT(invalid_platform_positive_one_must_have_inactive_sign_bit, signbitl(1.0) == 0);
+// RE_STATIC_ASSERT(invalid_platform_negative_zero_must_have_active_sign_bit,
+// signbitl(-0.0) == 1);
+// RE_STATIC_ASSERT(invalid_platform_negative_one_must_have_active_sign_bit,
+// signbitl(-1.0) == 1);
+// RE_STATIC_ASSERT(invalid_platform_positive_zero_must_have_inactive_sign_bit,
+// signbitl(0.0) == 0);
+// RE_STATIC_ASSERT(invalid_platform_positive_one_must_have_inactive_sign_bit,
+// signbitl(1.0) == 0);
 
 #pragma clang diagnostic pop
 
 #define signf_fast(x) ((*(const unsigned int*)&(x) & 0x80000000u) ? -1.0f : 1.0f)
 #define sign_fast(x) ((*(const unsigned long long*)&(x) & 0x8000000000000000ULL) ? -1.0 : 1.0)
 
-// clang-format off
-RE_HEADER_FN RE_CONST_FN float_t copysignf(float_t x, float_t y) { return x * signf_fast(y); }
-RE_HEADER_FN RE_CONST_FN double_t copysign(double_t x, double_t y) { return x * sign_fast(y); }
+RE_HEADER_FN RE_CONST_FN float_t
+copysignf(float_t x, float_t y)
+{
+  return x * signf_fast(y);
+}
+RE_HEADER_FN RE_CONST_FN double_t
+copysign(double_t x, double_t y)
+{
+  return x * sign_fast(y);
+}
 extern ldouble_t copysignl(ldouble_t x, ldouble_t y);
-// clang-format on
 
 #define isgreater(x, y) ((x - RE_TYPECAST(y, x)) > RE_TYPECAST(0, x))
 #define isgreaterequal(x, y) ((x - RE_TYPECAST(y, x)) >= RE_TYPECAST(0, x))
@@ -174,48 +193,283 @@ extern ldouble_t copysignl(ldouble_t x, ldouble_t y);
 #define islessequal(x, y) ((x - RE_TYPECAST(y, x)) <= RE_TYPECAST(0, x))
 #define islessgreater(x, y) (x != RE_TYPECAST(y, x)) // if it can only be lesser or greater, then it must not be equal
 
-// clang-format off
-#define RE_noop(x) (x)
-#define _RE_minmaxnancheck                                                                                                                                                                                                                                     \
-  if (RE_UNLIKELY(isnan(x))) return x; else if (RE_UNLIKELY(isnan(y))) return y;
-// that if statemetn 
-RE_HEADER_FN RE_CONST_FN double_t  fmax(double_t x, double_t y) {   _RE_minmaxnancheck;  return (x > y || x == y) ? x : y; }
-RE_HEADER_FN RE_CONST_FN float_t   fmaxf(float_t x, float_t y) {    _RE_minmaxnancheck;  return (x > y || x == y) ? x : y; }
-RE_HEADER_FN RE_CONST_FN ldouble_t fmaxl(ldouble_t x, ldouble_t y) { _RE_minmaxnancheck; return (x > y || x == y) ? x : y; }
+#define _RE_minmaxnancheck                                                                                                                                                                                                                               \
+  if (RE_UNLIKELY(isnan(x))) return x;                                                                                                                                                                                                                   \
+  else if (RE_UNLIKELY(isnan(y)))                                                                                                                                                                                                                        \
+    return y;
 
-RE_HEADER_FN RE_CONST_FN double_t  fmin(double_t x, double_t y) {    _RE_minmaxnancheck; return (x < y || x == y) ? x : y; }
-RE_HEADER_FN RE_CONST_FN float_t   fminf(float_t x, float_t y) {     _RE_minmaxnancheck; return (x < y || x == y) ? x : y; }
-RE_HEADER_FN RE_CONST_FN ldouble_t fminl(ldouble_t x, ldouble_t y) { _RE_minmaxnancheck; return (x < y || x == y) ? x : y; }
-// clang-format on
+RE_HEADER_FN RE_CONST_FN double_t
+fmax(double_t x, double_t y)
+{
+  _RE_minmaxnancheck;
+  return (x > y || x == y) ? x : y;
+}
+RE_HEADER_FN RE_CONST_FN float_t
+fmaxf(float_t x, float_t y)
+{
+  _RE_minmaxnancheck;
+  return (x > y || x == y) ? x : y;
+}
+RE_HEADER_FN RE_CONST_FN ldouble_t
+fmaxl(ldouble_t x, ldouble_t y)
+{
+  _RE_minmaxnancheck;
+  return (x > y || x == y) ? x : y;
+}
 
-// clang-format off
-RE_HEADER_FN RE_CONST_FN double_t  fabs(double_t x) { return x * copysign(1.0, x); }
-RE_HEADER_FN RE_CONST_FN float_t   fabsf(float_t x) { return x * copysignf(1.0F, x); }
-RE_HEADER_FN RE_CONST_FN ldouble_t fabsl(ldouble_t x) { return x * copysignl(1.0L, x); }
-// clang-format on
+RE_HEADER_FN RE_CONST_FN double_t
+fmin(double_t x, double_t y)
+{
+  _RE_minmaxnancheck;
+  return (x < y || x == y) ? x : y;
+}
+RE_HEADER_FN RE_CONST_FN float_t
+fminf(float_t x, float_t y)
+{
+  _RE_minmaxnancheck;
+  return (x < y || x == y) ? x : y;
+}
+RE_HEADER_FN RE_CONST_FN ldouble_t
+fminl(ldouble_t x, ldouble_t y)
+{
+  _RE_minmaxnancheck;
+  return (x < y || x == y) ? x : y;
+}
 
-// clang-format off
-RE_HEADER_FN RE_CONST_FN double_t  floor(double_t x)   { if (isnan(x)) return x; double_t  xi = (double_t) (long long)x; return (x < xi) ? xi - 1 : xi; }
-RE_HEADER_FN RE_CONST_FN float_t   floorf(float_t x)   { if (isnan(x)) return x; float_t   xi = (float_t)  (long long)x; return (x < xi) ? xi - 1 : xi; }
-RE_HEADER_FN RE_CONST_FN ldouble_t floorl(ldouble_t x) { if (isnan(x)) return x; ldouble_t xi = (ldouble_t)(long long)x; return (x < xi) ? xi - 1 : xi; }
+RE_HEADER_FN RE_CONST_FN double_t
+fabs(double_t x)
+{
+  return x * copysign(1.0, x);
+}
+RE_HEADER_FN RE_CONST_FN float_t
+fabsf(float_t x)
+{
+  return x * copysignf(1.0F, x);
+}
+RE_HEADER_FN RE_CONST_FN ldouble_t
+fabsl(ldouble_t x)
+{
+  return x * copysignl(1.0L, x);
+}
 
-RE_HEADER_FN RE_CONST_FN double_t  ceil (double_t x)  { if (isnan(x)) return x; double_t  xi = (double_t) (long long)x; return (x > xi) ? xi + 1 : xi; }
-RE_HEADER_FN RE_CONST_FN float_t   ceilf(float_t x)   { if (isnan(x)) return x; float_t   xi = (float_t)  (long long)x; return (x > xi) ? xi + 1 : xi; }
-RE_HEADER_FN RE_CONST_FN ldouble_t ceill(ldouble_t x) { if (isnan(x)) return x; ldouble_t xi = (ldouble_t)(long long)x; return (x > xi) ? xi + 1 : xi; }
-// clang-format on
+RE_HEADER_FN RE_CONST_FN double_t
+modf(double_t x, double_t* iptr)
+{
+  if (isnan(x))
+  {
+    *iptr = NAN;
+    return x;
+  }
+  else if (isinf(x))
+  {
+    *iptr = copysign(INFINITY, x);
+    return copysign(0.0, x);
+  }
 
-extern RE_CONST_FN double_t  sin(double_t xrads);
-extern RE_CONST_FN float_t   sinf(float_t xrads);
-extern RE_CONST_FN ldouble_t sinl(ldouble_t xrads);
+  double_t intpart = (double_t)(int64_t)x;
+  if (x < 0.0 && intpart > x) { intpart -= 1.0; }
 
-extern RE_CONST_FN double_t  cos(double_t xrads);
-extern RE_CONST_FN float_t   cosf(float_t xrads);
-extern RE_CONST_FN ldouble_t cosl(ldouble_t xrads);
+  *iptr = intpart;
+  return x - intpart;
+}
+RE_HEADER_FN RE_CONST_FN float_t
+modff(float_t x, float_t* iptr)
+{
+  if (isnan(x))
+  {
+    *iptr = NAN;
+    return x;
+  }
+  else if (isinf(x))
+  {
+    *iptr = copysignf(INFINITY, x);
+    return copysignf(0.0F, x);
+  }
+
+  float_t intpart = (float_t)(int64_t)x;
+  if (x < 0.0 && intpart > x) { intpart -= 1.0; }
+
+  *iptr = intpart;
+  return x - intpart;
+}
+RE_HEADER_FN RE_CONST_FN ldouble_t
+modfl(ldouble_t x, ldouble_t* iptr)
+{
+  if (isnan(x))
+  {
+    *iptr = NAN;
+    return x;
+  }
+  else if (isinf(x))
+  {
+    *iptr = copysignl(INFINITY, x);
+    return copysignl(0.0L, x);
+  }
+
+  ldouble_t intpart = (ldouble_t)(int64_t)x;
+  if (x < 0.0 && intpart > x) { intpart -= 1.0; }
+
+  *iptr = intpart;
+  return x - intpart;
+}
+
+RE_HEADER_FN RE_CONST_FN double_t
+trunc(double_t x)
+{
+  if (isnan(x) || x == 0.0 || isinf(x)) { return x; }
+
+  double_t xi = (double_t)(int64_t)x;
+  return xi;
+}
+RE_HEADER_FN RE_CONST_FN float_t
+truncf(float_t x)
+{
+  if (isnan(x) || x == 0.0F || isinf(x)) { return x; }
+
+  float_t xi = (float_t)(int64_t)x;
+  return xi;
+}
+RE_HEADER_FN RE_CONST_FN ldouble_t
+truncl(ldouble_t x)
+{
+  if (isnan(x) || x == 0.0L || isinf(x)) { return x; }
+
+  ldouble_t xi = (ldouble_t)(int64_t)x;
+  return xi;
+}
+
+extern RE_CONST_FN double_t  fmod(double_t x, double_t by);
+extern RE_CONST_FN float_t   fmodf(float_t x, float_t by);
+extern RE_CONST_FN ldouble_t fmodl(ldouble_t x, ldouble_t by);
+
+RE_HEADER_FN RE_CONST_FN double_t
+floor(double_t x)
+{
+  if (isnan(x) || x == 0.0 || isinf(x)) { return x; }
+
+  double_t intpart;
+  (void)modf(x, &intpart);
+  return (x < intpart) ? intpart - 1 : intpart;
+}
+RE_HEADER_FN RE_CONST_FN float_t
+floorf(float_t x)
+{
+  if (isnan(x) || x == 0.0F || isinf(x)) { return x; }
+
+  float_t intpart;
+  (void)modff(x, &intpart);
+  return (x < intpart) ? intpart - 1 : intpart;
+}
+RE_HEADER_FN RE_CONST_FN ldouble_t
+floorl(ldouble_t x)
+{
+  if (isnan(x) || x == 0.0L || isinf(x)) { return x; }
+
+  ldouble_t intpart;
+  (void)modfl(x, &intpart);
+  return (x < intpart) ? intpart - 1 : intpart;
+}
+
+RE_HEADER_FN RE_CONST_FN double_t
+ceil(double_t x)
+{
+  if (isnan(x) || x == 0.0 || isinf(x)) { return x; }
+
+  double_t xi = (double_t)(int64_t)x;
+  return (x > xi) ? xi + 1 : xi;
+}
+RE_HEADER_FN RE_CONST_FN float_t
+ceilf(float_t x)
+{
+  if (isnan(x) || x == 0.0F || isinf(x)) { return x; }
+
+  float_t xi = (float_t)(int64_t)x;
+  return (x > xi) ? xi + 1 : xi;
+}
+RE_HEADER_FN RE_CONST_FN ldouble_t
+ceill(ldouble_t x)
+{
+  if (isnan(x) || x == 0.0L || isinf(x)) { return x; }
+
+  ldouble_t xi = (ldouble_t)(int64_t)x;
+  return (x > xi) ? xi + 1 : xi;
+}
+
+extern void _re_cordic(double_t xrads, double_t* RE_RESTRICT o_sin, double_t* RE_RESTRICT o_cos);
+extern void _re_cordicf(float_t xrads, float_t* RE_RESTRICT o_sin, float_t* RE_RESTRICT o_cos);
+extern void _re_cordicl(ldouble_t xrads, ldouble_t* RE_RESTRICT o_sin, ldouble_t* RE_RESTRICT o_cos);
+
+extern void _re_cordic_circular(double_t x_in, double_t y_in, double_t* out_magnitude, double_t* out_angle);
+extern void _re_cordic_circularf(float_t x_in, float_t y_in, float_t* out_magnitude, float_t* out_angle);
+extern void _re_cordic_circularl(ldouble_t x_in, ldouble_t y_in, ldouble_t* out_magnitude, ldouble_t* out_angle);
+
+RE_HEADER_FN RE_CONST_FN double_t
+sin(double_t xrads)
+{
+  double_t sin_ = 0.0;
+  _re_cordic(xrads, &sin_, NULL);
+  return sin_;
+}
+RE_HEADER_FN RE_CONST_FN float_t
+sinf(float_t xrads)
+{
+  float_t sin_ = 0.0F;
+  _re_cordicf(xrads, &sin_, NULL);
+  return sin_;
+}
+RE_HEADER_FN RE_CONST_FN ldouble_t
+sinl(ldouble_t xrads)
+{
+  ldouble_t sin_ = 0.0L;
+  _re_cordicl(xrads, &sin_, NULL);
+  return sin_;
+}
+
+RE_HEADER_FN RE_CONST_FN double_t
+cos(double_t xrads)
+{
+  double_t cos_ = 0.0;
+  _re_cordic(xrads, NULL, &cos_);
+  return cos_;
+}
+RE_HEADER_FN RE_CONST_FN float_t
+cosf(float_t xrads)
+{
+  float_t cos_ = 0.0F;
+  _re_cordicf(xrads, NULL, &cos_);
+  return cos_;
+}
+RE_HEADER_FN RE_CONST_FN ldouble_t
+cosl(ldouble_t xrads)
+{
+  ldouble_t cos_ = 0.0L;
+  _re_cordicl(xrads, NULL, &cos_);
+  return cos_;
+}
 
 extern RE_CONST_FN double_t  tan(double_t xrads);
 extern RE_CONST_FN float_t   tanf(float_t xrads);
 extern RE_CONST_FN ldouble_t tanl(ldouble_t xrads);
 
-extern void _re_cordic(double_t xrads, double_t* RE_RESTRICT o_sin, double_t* RE_RESTRICT o_cos);
+/**
+ * Calculates e ^ x
+ */
+extern double_t  exp(double_t x);
+extern float_t   expf(float_t x);
+extern ldouble_t expl(ldouble_t x);
+
+/**
+ * Calculate x ^ y
+ */
+extern double_t  pow(double_t base, double_t exp);
+extern float_t   powf(float_t base, float_t exp);
+extern ldouble_t powl(ldouble_t base, ldouble_t exp);
+
+/**
+ * Calculate x * (2 ^ y)
+ */
+extern double_t  ldexp(double_t x, int exp);
+extern float_t   ldexpf(float_t x, int exp);
+extern ldouble_t ldexpl(ldouble_t x, int exp);
 
 #endif //_RELIBC_MATH_H

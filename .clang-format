@@ -20,7 +20,7 @@ SortIncludes: CaseSensitive
 SpaceBeforeAssignmentOperators: true
 IndentPPDirectives: AfterHash
 PPIndentWidth: 2
-AllowShortFunctionsOnASingleLine: All
+AllowShortFunctionsOnASingleLine: Inline
 AllowShortBlocksOnASingleLine: Always
 AllowShortIfStatementsOnASingleLine: Always
 AllowShortLoopsOnASingleLine: false
