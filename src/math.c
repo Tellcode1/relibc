@@ -1,7 +1,9 @@
-#include "math.h"
-#include ".cordic_atan_table.h"
-#include "fenv.h"
-#include "stdafx.h"
+#include "../include/math.h"
+#include "../.cordic_atan_table.h"
+#include "../include/attributes.h"
+#include "../include/fenv.h"
+#include "../include/floatfmt.h"
+#include "../include/stdafx.h"
 #include <stdbool.h>
 
 fenv_t _re_fe_curr_env = _re_def_fe_env;
@@ -351,11 +353,11 @@ _re_mask_fp_excepts(int excepts, int mask_or_unmask)
 #if defined(__STDC_IEC_559__)
 
 #  if defined(__x86_64__) || defined(__i386__)
-  attr_aligned(16) uint16_t cw    = 0;
-  attr_aligned(16) uint32_t mxcsr = 0;
+  RE_ATTR_ALIGNED(16) uint16_t cw    = 0;
+  RE_ATTR_ALIGNED(16) uint32_t mxcsr = 0;
 
-  re_volatile_asm("fnstcw %0" : "=m"(cw));
-  re_volatile_asm("stmxcsr %0" : "=m"(mxcsr));
+  __asm__ volatile("fnstcw %0" : "=m"(cw));
+  __asm__ volatile("stmxcsr %0" : "=m"(mxcsr));
 
   if (mask_or_unmask == FE_MASK_UNMASK) { cw &= ~(uint16_t)(excepts); }
   else { cw |= (uint16_t)(excepts); }
@@ -364,11 +366,11 @@ _re_mask_fp_excepts(int excepts, int mask_or_unmask)
   if (mask_or_unmask == FE_MASK_UNMASK) { mxcsr &= ~mxcsr_mask_bits; }
   else { mxcsr |= mxcsr_mask_bits; }
 
-  re_volatile_asm("fldcw %0" : : "m"(cw));
-  re_volatile_asm("ldmxcsr %0" : : "m"(mxcsr));
+  __asm__ volatile("fldcw %0" : : "m"(cw));
+  __asm__ volatile("ldmxcsr %0" : : "m"(mxcsr));
 #  elif defined(__aarch64__) || defined(__arm__)
   uint32_t fpscr;
-  re_volatile_asm("vmrs %0, fpscr" : "=r"(fpscr));
+  asm volatile("vmrs %0, fpscr" : "=r"(fpscr));
 
   if (mask_or_unmask == FE_MASK_UNMASK) { cw &= ~(uint16_t)(excepts); }
   else { cw |= (uint16_t)(excepts); }
@@ -377,7 +379,7 @@ _re_mask_fp_excepts(int excepts, int mask_or_unmask)
   if (mask_or_unmask == FE_MASK_UNMASK) { mxcsr &= ~mxcsr_mask_bits; }
   else { mxcsr |= mxcsr_mask_bits; }
 
-  re_volatile_asm("vmsr fpscr, %0" : : "r"(fpscr));
+  __asm__ volatile("vmsr fpscr, %0" : : "r"(fpscr));
 #  else
   return -1;
 #  endif
@@ -441,9 +443,9 @@ feraiseexcept(int excepts)
 double_t
 fmod(double_t x, double_t by)
 {
-  if (isnan(x)) { return x; }
-  if (isnan(by)) { return by; }
-  if (by == 0.0)
+  if (RE_UNLIKELY(isnan(x))) { return x; }
+  if (RE_UNLIKELY(isnan(by))) { return by; }
+  if (RE_UNLIKELY(by == 0.0))
   {
     feraiseexcept(FE_DIVBYZERO);
     return NAN;
@@ -451,12 +453,13 @@ fmod(double_t x, double_t by)
 
   return x - trunc(x / by) * by;
 }
+
 float_t
 fmodf(float_t x, float_t by)
 {
-  if (isnan(x)) { return x; }
-  if (isnan(by)) { return by; }
-  if (by == 0.0)
+  if (RE_UNLIKELY(isnan(x))) { return x; }
+  if (RE_UNLIKELY(isnan(by))) { return by; }
+  if (RE_UNLIKELY(by == 0.0))
   {
     feraiseexcept(FE_DIVBYZERO);
     return NAN;
@@ -464,12 +467,13 @@ fmodf(float_t x, float_t by)
 
   return x - truncf(x / by) * by;
 }
+
 ldouble_t
 fmodl(ldouble_t x, ldouble_t by)
 {
-  if (isnan(x)) { return x; }
-  if (isnan(by)) { return by; }
-  if (by == 0.0)
+  if (RE_UNLIKELY(isnan(x))) { return x; }
+  if (RE_UNLIKELY(isnan(by))) { return by; }
+  if (RE_UNLIKELY(by == 0.0))
   {
     feraiseexcept(FE_DIVBYZERO);
     return NAN;
@@ -487,7 +491,7 @@ exp(double_t x)
     uint64_t i;
   } cvt;
 
-  double_t t  = x * M_LOG2E; // log2(e)
+  double_t t  = x * M_LOG2E;
   double_t fi = floor(t);
   double_t f  = t - fi;
   int64_t  i  = (int64_t)fi;
@@ -548,17 +552,204 @@ powl(ldouble_t base, ldouble_t exp)
 double_t
 ldexp(double_t x, int exp)
 {
-  if (isnan(x) || x == 0.0 || isinf(x) || exp == 0) { return x; }
+  if (RE_UNLIKELY(isnan(x) || x == 0.0 || isinf(x) || exp == 0)) { return x; }
 
-  
+  struct double_repr repr = re_break_double(x);
+  repr.exponent += exp;
+  return re_make_double(repr);
 }
 
 float_t
 ldexpf(float_t x, int exp)
 {
+  if (RE_UNLIKELY(isnan(x) || x == 0.0F || isinf(x) || exp == 0)) { return x; }
+
+  struct float_repr repr = re_break_float(x);
+  repr.exponent += exp;
+  return re_make_float(repr);
 }
 
 ldouble_t
 ldexpl(ldouble_t x, int exp)
 {
+  if (RE_UNLIKELY(isnan(x) || x == 0.0L || isinf(x) || exp == 0)) { return x; }
+
+  struct long_double_repr repr = re_break_long_double(x);
+  repr.exponent += exp;
+  return re_make_long_double(repr);
 }
+
+double_t
+frexp(double_t num, int* exp)
+{
+  if (RE_UNLIKELY(num == 0.0))
+  {
+    if (RE_LIKELY(exp)) { *exp = 0; }
+    return 0.0;
+  }
+
+  struct double_repr repr = re_break_double(num);
+
+  if (RE_LIKELY(exp)) { *exp = repr.exponent + 1; }
+
+  // repr.sign     = repr.sign;
+  repr.exponent = -1; // -1 exponent = 0.5 ≤ m < 1.0
+  repr.mantissa = repr.mantissa;
+  return re_make_double(repr);
+}
+
+float_t
+frexpf(float_t num, int* exp)
+{
+  if (RE_UNLIKELY(num == 0.0F))
+  {
+    if (RE_LIKELY(exp)) { *exp = 0; }
+    return 0.0F;
+  }
+
+  struct float_repr repr = re_break_float(num);
+
+  if (RE_LIKELY(exp)) { *exp = repr.exponent + 1; }
+
+  // repr.sign     = repr.sign;
+  repr.exponent = -1; // -1 exponent = 0.5 ≤ m < 1.0
+  repr.mantissa = repr.mantissa;
+  return re_make_float(repr);
+}
+
+ldouble_t
+frexpl(ldouble_t num, int* exp)
+{
+  if (RE_UNLIKELY(num == 0.0L))
+  {
+    if (RE_LIKELY(exp)) { *exp = 0; }
+    return 0.0L;
+  }
+
+  struct long_double_repr repr = re_break_long_double(num);
+
+  if (RE_LIKELY(exp)) { *exp = repr.exponent + 1; }
+
+  // repr.sign     = repr.sign;
+  repr.exponent = -1; // -1 exponent = 0.5 ≤ m < 1.0
+  repr.mantissa = repr.mantissa;
+  return re_make_long_double(repr);
+}
+
+double_t
+log(double_t x)
+{
+  if (RE_UNLIKELY(x < 0.0)) { return NAN; }
+  else if (RE_UNLIKELY(x == 0.0)) { return -INFINITY; }
+  else if (RE_UNLIKELY(isinf(x))) { return copysign(INFINITY, x); }
+
+  int      exponent            = 0;
+  double_t fractional_mantissa = frexp(x, &exponent); // 0.5 <= fractional_mantissa <= 1.0
+  fractional_mantissa *= 2.0;                         // bring fractional_mantissa to 1.0 <= fractional_mantissa <= 2.0
+  exponent--;                                         // subtract the exponent by 1 so we aren't actually modifying the number, just how we chose to represent it
+
+  // Use the derived formula: ln (x) = ln(m) + exponent * ln(2), where m is the fractional mantissa and exponent is the integral exponent of x
+  // You can derive the formula from the IEEE754 floating point representation: x = m * 2 ^ exponent.
+
+  // Use horner's method on a mercator series to calculate ln(m) or the natural logarithm of the fractional mantissa
+  // the series falls off in accuracy near its bounds so that's an issue.
+  double_t z         = (fractional_mantissa - 1) / (fractional_mantissa + 1);
+  double_t z_squared = z * z;
+
+  const int iterations = 8;
+
+  double_t result = 1.0 / (double_t)(2 * iterations + 1);
+  for (int i = iterations - 1; i >= 0; i--) // its - 1 because we seeded the first term manually
+  {
+    result = (1.0 / (double_t)((2 * i) + 1)) + z_squared * result;
+  }
+
+  double_t ln_fractional_mantissa = 2.0 * z * result;         // ln(m)
+  return ln_fractional_mantissa + (double_t)exponent * M_LN2; // ln(m) + exponent * ln(2)
+}
+
+float_t
+logf(float_t x)
+{
+  if (RE_UNLIKELY(x < 0.0F)) { return NAN; }
+  else if (RE_UNLIKELY(x == 0.0F)) { return -INFINITY; }
+  else if (RE_UNLIKELY(isinf(x))) { return copysignf(INFINITY, x); }
+
+  int     exponent            = 0;
+  float_t fractional_mantissa = frexpf(x, &exponent); // 0.5 <= fractional_mantissa <= 1.0
+  fractional_mantissa *= 2.0F;                        // bring fractional_mantissa to 1.0 <= fractional_mantissa <= 2.0
+  exponent--;                                         // subtract the exponent by 1 so we aren't actually modifying the number, just how we chose to represent it
+
+  // Use the derived formula: ln (x) = ln(m) + exponent * ln(2), where m is the fractional mantissa and exponent is the integral exponent of x
+  // You can derive the formula from the IEEE754 floating point representation: x = m * 2 ^ exponent.
+
+  // Use horner's method on a mercator series to calculate ln(m) or the natural logarithm of the fractional mantissa
+  // the series falls off in accuracy near its bounds so that's an issue.
+  float_t z         = (fractional_mantissa - 1) / (fractional_mantissa + 1);
+  float_t z_squared = z * z;
+
+  const int iterations = 4;
+
+  float_t result = 1.0 / (float_t)(2 * iterations + 1);
+  for (int i = iterations - 1; i >= 0; i--) // its - 1 because we seeded the first term manually
+  {
+    result = (1.0F / (float_t)((2 * i) + 1)) + z_squared * result;
+  }
+
+  float_t ln_fractional_mantissa = 2.0F * z * result;        // ln(m)
+  return ln_fractional_mantissa + (float_t)exponent * M_LN2; // ln(m) + exponent * ln(2)
+}
+
+ldouble_t
+logl(ldouble_t x)
+{
+  if (RE_UNLIKELY(x < 0.0F)) { return NAN; }
+  else if (RE_UNLIKELY(x == 0.0F)) { return -INFINITY; }
+  else if (RE_UNLIKELY(isinf(x))) { return copysignl(INFINITY, x); }
+
+  int       exponent            = 0;
+  ldouble_t fractional_mantissa = frexpl(x, &exponent); // 0.5 <= fractional_mantissa <= 1.0
+  fractional_mantissa *= 2.0F;                          // bring fractional_mantissa to 1.0 <= fractional_mantissa <= 2.0
+  exponent--;                                           // subtract the exponent by 1 so we aren't actually modifying the number, just how we chose to represent it
+
+  // Use the derived formula: ln (x) = ln(m) + exponent * ln(2), where m is the fractional mantissa and exponent is the integral exponent of x
+  // You can derive the formula from the IEEE754 floating point representation: x = m * 2 ^ exponent.
+
+  // Use horner's method on a mercator series to calculate ln(m) or the natural logarithm of the fractional mantissa
+  // the series falls off in accuracy near its bounds so that's an issue.
+  ldouble_t z         = (fractional_mantissa - 1) / (fractional_mantissa + 1);
+  ldouble_t z_squared = z * z;
+
+  const int iterations = 16;
+
+  ldouble_t result = 1.0 / (ldouble_t)(2 * iterations + 1);
+  for (int i = iterations - 1; i >= 0; i--) // its - 1 because we seeded the first term manually
+  {
+    result = (1.0F / (ldouble_t)((2 * i) + 1)) + z_squared * result;
+  }
+
+  ldouble_t ln_fractional_mantissa = 2.0F * z * result;        // ln(m)
+  return ln_fractional_mantissa + (ldouble_t)exponent * M_LN2; // ln(m) + exponent * ln(2)
+}
+
+double_t
+log10(double_t x)
+{
+  return log(x) / M_LN10;
+}
+
+float_t
+log10f(float_t x)
+{
+  return logf(x) / (float_t)M_LN10;
+}
+
+ldouble_t
+log10l(ldouble_t x)
+{
+  return logl(x) / M_LN10l;
+}
+
+extern double_t  log2(double_t x);
+extern float_t   log2f(float_t x);
+extern ldouble_t log2l(ldouble_t x);

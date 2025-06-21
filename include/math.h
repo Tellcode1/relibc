@@ -2,8 +2,9 @@
 #define _RELIBC_MATH_H
 
 #include "float.h"
+#include "floatfmt.h"
+#include "stdafx.h"
 #include "stdint.h"
-#include <string.h>
 
 #ifndef __STDC_IEC_559__
 #  error RElib depends on IEE-754 floating point numbers. Sorry for the inconvenience.
@@ -18,7 +19,6 @@
 #endif
 
 #define RE_HEADER_FN static inline
-#define RE_STATIC_ASSERT(error_name, assertion) typedef int _assertion_fail__##error_name##__[(assertion) ? 1 : -1];
 
 #if (__STDC_VERSION__ >= 199901L)
 #  define RE_TYPECAST(to_cast, var_or_type_to_cast_to) ((__typeof__(var_or_type_to_cast_to))to_cast)
@@ -30,22 +30,6 @@
 #  define RE_CONST_FN __attribute__((const))
 #else
 #  define RE_CONST_FN
-#endif
-
-#if defined(__has_builtin) && __has_builtin(__builtin_expect)
-#  define RE_UNLIKELY(unlikely_to_return_true) __builtin_expect(!!(unlikely_to_return_true), 0)
-#  define RE_LIKELY(likely_to_return_true) __builtin_expect(!!(likely_to_return_true), 1)
-#else
-#  define RE_UNLIKELY(unlikely_to_return_true)
-#  define RE_LIKELY(likely_to_return_true)
-#endif
-
-#if defined(__GNUC__) && ((__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1))
-#  define RE_RESTRICT __restrict
-#elif defined(_MSC_VER) && _MSC_VER >= 1400
-#  define RE_RESTRICT __restrict
-#else
-#  define RE_RESTRICT
 #endif
 
 #define M_E 2.718281828459045       // The value of euler's number
@@ -87,8 +71,8 @@
 #  define INFINITY (__builtin_inff())
 #  define NAN (__builtin_nanf(""))
 #else
-#  define INFINITY (1.0 / 0.0)
-#  define NAN = (0.0 / 0.0)
+#  define INFINITY ((double)(0x7FF0000000000000))
+#  define NAN (0.0 / 0.0)
 #endif
 
 #define HUGE_VAL INFINITY
@@ -136,12 +120,7 @@
 RE_HEADER_FN RE_CONST_FN int
 _re_signbit(double_t x)
 {
-  union
-  {
-    double_t           d;
-    unsigned long long u;
-  } u = { x };
-  return (int)((u.u >> (sizeof(double_t) * 8 - 1)) & 1);
+  return re_break_double(x).sign;
 }
 
 /**
@@ -253,6 +232,40 @@ fabsl(ldouble_t x)
 }
 
 RE_HEADER_FN RE_CONST_FN double_t
+trunc(double_t x)
+{
+  if (isnan(x) || x == 0.0 || isinf(x)) { return x; }
+
+  struct double_repr repr            = re_break_double(x);
+  int                bits_to_discard = DBL_MANT_DIG - (repr.exponent + 1);
+  repr.mantissa >>= bits_to_discard; // we shift all the mantissa bits to the right
+  repr.mantissa <<= bits_to_discard; // shift back to the left, all bits after decimal point cleared.
+  return re_make_double(repr);
+}
+RE_HEADER_FN RE_CONST_FN float_t
+truncf(float_t x)
+{
+  if (isnan(x) || x == 0.0F || isinf(x)) { return x; }
+
+  struct float_repr repr            = re_break_float(x);
+  int               bits_to_discard = FLT_MANT_DIG - (repr.exponent + 1);
+  repr.mantissa >>= bits_to_discard; // we shift all the mantissa bits to the right
+  repr.mantissa <<= bits_to_discard; // shift back to the left, all bits after decimal point cleared.
+  return re_make_float(repr);
+}
+RE_HEADER_FN RE_CONST_FN ldouble_t
+truncl(ldouble_t x)
+{
+  if (isnan(x) || x == 0.0L || isinf(x)) { return x; }
+
+  struct long_double_repr repr            = re_break_long_double(x);
+  int                     bits_to_discard = LDBL_MANT_DIG - (repr.exponent + 1);
+  repr.mantissa >>= bits_to_discard; // we shift all the mantissa bits to the right
+  repr.mantissa <<= bits_to_discard; // shift back to the left, all bits after decimal point cleared.
+  return re_make_long_double(repr);
+}
+
+RE_HEADER_FN RE_CONST_FN double_t
 modf(double_t x, double_t* iptr)
 {
   if (isnan(x))
@@ -266,7 +279,7 @@ modf(double_t x, double_t* iptr)
     return copysign(0.0, x);
   }
 
-  double_t intpart = (double_t)(int64_t)x;
+  double_t intpart = trunc(x);
   if (x < 0.0 && intpart > x) { intpart -= 1.0; }
 
   *iptr = intpart;
@@ -286,7 +299,7 @@ modff(float_t x, float_t* iptr)
     return copysignf(0.0F, x);
   }
 
-  float_t intpart = (float_t)(int64_t)x;
+  float_t intpart = trunc(x);
   if (x < 0.0 && intpart > x) { intpart -= 1.0; }
 
   *iptr = intpart;
@@ -306,36 +319,11 @@ modfl(ldouble_t x, ldouble_t* iptr)
     return copysignl(0.0L, x);
   }
 
-  ldouble_t intpart = (ldouble_t)(int64_t)x;
+  ldouble_t intpart = trunc(x);
   if (x < 0.0 && intpart > x) { intpart -= 1.0; }
 
   *iptr = intpart;
   return x - intpart;
-}
-
-RE_HEADER_FN RE_CONST_FN double_t
-trunc(double_t x)
-{
-  if (isnan(x) || x == 0.0 || isinf(x)) { return x; }
-
-  double_t xi = (double_t)(int64_t)x;
-  return xi;
-}
-RE_HEADER_FN RE_CONST_FN float_t
-truncf(float_t x)
-{
-  if (isnan(x) || x == 0.0F || isinf(x)) { return x; }
-
-  float_t xi = (float_t)(int64_t)x;
-  return xi;
-}
-RE_HEADER_FN RE_CONST_FN ldouble_t
-truncl(ldouble_t x)
-{
-  if (isnan(x) || x == 0.0L || isinf(x)) { return x; }
-
-  ldouble_t xi = (ldouble_t)(int64_t)x;
-  return xi;
 }
 
 extern RE_CONST_FN double_t  fmod(double_t x, double_t by);
@@ -466,10 +454,31 @@ extern float_t   powf(float_t base, float_t exp);
 extern ldouble_t powl(ldouble_t base, ldouble_t exp);
 
 /**
- * Calculate x * (2 ^ y)
+ * Calculate x * (2 ^ exp)
+ * This decomposes the number into exponent and mantissa, and adds the exponent.
  */
 extern double_t  ldexp(double_t x, int exp);
 extern float_t   ldexpf(float_t x, int exp);
 extern ldouble_t ldexpl(ldouble_t x, int exp);
+
+/**
+ * The log base e (natural logarithm)!
+ * This is not the log base 10! Use log10 for that
+ */
+extern double_t  log(double_t x);
+extern float_t   logf(float_t x);
+extern ldouble_t logl(ldouble_t x);
+
+extern double_t  log10(double_t x);
+extern float_t   log10f(float_t x);
+extern ldouble_t log10l(ldouble_t x);
+
+extern double_t  log2(double_t x);
+extern float_t   log2f(float_t x);
+extern ldouble_t log2l(ldouble_t x);
+
+extern double_t  frexp(double_t num, int* exp);
+extern float_t   frexpf(float_t num, int* exp);
+extern ldouble_t frexpl(ldouble_t num, int* exp);
 
 #endif //_RELIBC_MATH_H

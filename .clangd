@@ -1,0 +1,4 @@
+# CompileFlags:
+#   Add: [-g -fno-builtin -nostdlib -ffreestanding]
+# LinkFlags:
+#   Add: [-g -fno-builtin -nostdlib -ffreestanding]

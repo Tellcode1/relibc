@@ -1,10 +1,10 @@
 CC = cc
-CFLAGS = -g -fno-builtin -std=c99
-LDFLAGS = -g -fno-builtin -std=c99
+CFLAGS = -O2 # -fno-builtin -nostdlib -ffreestanding
+LDFLAGS = -O2 # -fno-builtin -nostdlib -ffreestanding
 
 CORDIC_TABLE_FILE = .cordic_atan_table.h
 
-OBJS = relibtest.o relibc.c math.c
+OBJS = src/relibtest.o src/relibc.o src/math.o src/core.o src/sysalloc.o src/floatfmt.o
 
 PRINTCC =       "CC          %-28s\n" "$@"
 PRINTCFLAGS =   "CFLAGS      %-28s\n" "$(CFLAGS)"
