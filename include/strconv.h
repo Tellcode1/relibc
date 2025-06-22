@@ -83,10 +83,16 @@ extern "C"
    */
   extern int atoi(const char* in_string);
 
+  extern double atof2(const char* in_string, size_t max);
+
   /**
    * @brief Converts a string to a double.
    */
-  extern double atof(const char* in_string);
+  static inline double
+  atof(const char* in_string)
+  {
+    return atof2(in_string, SIZE_MAX);
+  }
 
   /**
    * @brief Converts a string to a boolean.

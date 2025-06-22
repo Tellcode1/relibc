@@ -34,20 +34,20 @@ extern fenv_t       _re_fe_curr_env;
 #define FE_TOWARDZERO 2
 #define FE_UPWARD 3
 
-RE_HEADER_FN int
+static inline  int
 feclearexcept(int excepts)
 {
   _re_fe_curr_env.except &= ~excepts;
   return 0;
 }
 
-RE_HEADER_FN int
+static inline  int
 fetestexcept(int excepts)
 {
   return (int)(_re_fe_curr_env.except & excepts);
 }
 
-RE_HEADER_FN int
+static inline  int
 fegetexceptflag(fexcept_t* o_excepts, int excepts_to_check)
 {
   *o_excepts = 0;
@@ -58,7 +58,7 @@ fegetexceptflag(fexcept_t* o_excepts, int excepts_to_check)
   return 0;
 }
 
-RE_HEADER_FN int
+static inline  int
 fesetexceptflag(const fexcept_t* excepts, int excepts_to_set)
 {
   for (int i = 0; i < (sizeof(fexcept_t) * 8); i++)
@@ -74,21 +74,21 @@ fesetexceptflag(const fexcept_t* excepts, int excepts_to_set)
  */
 extern int feraiseexcept(int excepts);
 
-RE_HEADER_FN int
+static inline  int
 fegetenv(fenv_t* env)
 {
   *env = _re_fe_curr_env;
   return 0;
 }
 
-RE_HEADER_FN int
+static inline  int
 fesetenv(const fenv_t* env)
 {
   _re_fe_curr_env = *env;
   return 0;
 }
 
-RE_HEADER_FN int
+static inline  int
 feupdateenv(const fenv_t* env)
 {
   fenv_t tmp_copy = _re_fe_curr_env;
@@ -96,7 +96,7 @@ feupdateenv(const fenv_t* env)
   return feraiseexcept(tmp_copy.except);
 }
 
-RE_HEADER_FN int
+static inline  int
 feholdexcept(fenv_t* env)
 {
   if (env == NULL) return -1;

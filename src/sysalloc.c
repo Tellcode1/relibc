@@ -1,11 +1,17 @@
 #include "../include/string.h"
 #include "../include/sysalloc/allocator.h"
+#include <stdio.h>
+#include <unistd.h>
 
 void*
 malloc(size_t size)
 {
   void* ret = heap + heap_bumper;
   heap_bumper += size;
+  char buffer[128];
+  itoa(size, buffer, 10, sizeof(buffer), false);
+  strlcat(buffer, "\n", sizeof(buffer));
+  write(STDOUT_FILENO, buffer, strlen(buffer));
   return ret;
 }
 

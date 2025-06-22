@@ -1,8 +1,9 @@
 #ifndef _RE_STDIO_H
 #define _RE_STDIO_H
 
-#include "stream.h"
 #include <stddef.h>
+#include "stdafx.h"
+#include "errorcodes.h"
 
 typedef long    ssize_t;
 typedef ssize_t fpos_t;

@@ -72,7 +72,7 @@ re_log_va(const char* file, size_t line, const char* fn, const char* preceder, b
 // printf
 
 size_t
-re_itoa2(intmax_t num, char out[], int base, size_t max, bool add_commas)
+itoa2(intmax_t num, char out[], int base, size_t max, bool add_commas)
 {
   re_assert(base >= 2 && base <= 36);
   re_assert(out != NULL);
@@ -166,7 +166,7 @@ re_itoa2(intmax_t num, char out[], int base, size_t max, bool add_commas)
 }
 
 size_t
-re_utoa2(uintmax_t num, char out[], int base, size_t max, bool add_commas)
+utoa2(uintmax_t num, char out[], int base, size_t max, bool add_commas)
 {
   re_assert(base >= 2 && base <= 36);
   re_assert(out != NULL);
@@ -256,7 +256,7 @@ re_utoa2(uintmax_t num, char out[], int base, size_t max, bool add_commas)
 // WARNING::: I didn't write most of this, stole it from stack overflow.
 // if it explodes your computer its your fault!!!
 size_t
-re_ftoa2(double num, char out[], int precision, size_t max, bool remove_zeros)
+ftoa2(double num, char out[], int precision, size_t max, bool remove_zeros)
 {
   if (max == 0) { return 0; }
   if (max == 1)
@@ -292,7 +292,7 @@ re_ftoa2(double num, char out[], int precision, size_t max, bool remove_zeros)
   // int part is now floored
   double frac_part = num - (double)int_part;
 
-  itr += re_utoa2(int_part, itr, 10, max - 1, false);
+  itr += utoa2(int_part, itr, 10, max - 1, false);
 
   if (precision > 0 && (size_t)(itr - out) < max - 2)
   {
@@ -388,7 +388,7 @@ re_atoi(const char in_string[], size_t max)
 }
 
 double
-re_atof(const char in_string[], size_t max)
+atof2(const char in_string[], size_t max)
 {
   if (!in_string) { return 0.0; }
 
@@ -466,7 +466,7 @@ re_atof(const char in_string[], size_t max)
 }
 
 bool
-re_atobool(const char in_string[], size_t max)
+atobool(const char in_string[], size_t max)
 {
   size_t i = 0;
   RE_SKIP_WHITSPACE(in_string);
@@ -476,7 +476,7 @@ re_atobool(const char in_string[], size_t max)
 }
 
 size_t
-re_ptoa2(void* ptr, char out[], size_t max)
+ptoa2(void* ptr, char out[], size_t max)
 {
   if (ptr == NULL) { return strncpy2(out, "NULL", max); }
 
@@ -501,7 +501,7 @@ re_ptoa2(void* ptr, char out[], size_t max)
 
 /* Written by yours truly. */
 size_t
-re_btoa2(size_t num_bytes, bool upgrade, char out[], size_t max)
+btoa2(size_t num_bytes, bool upgrade, char out[], size_t max)
 {
   size_t written = 0;
   if (upgrade)
@@ -517,12 +517,12 @@ re_btoa2(size_t num_bytes, bool upgrade, char out[], size_t max)
       b /= 1000.0;
     }
 
-    written = re_ftoa2(b, out, 3, max, 1);
+    written = ftoa2(b, out, 3, max, 1);
     strcat_max(out, stages[stagei], max);
     written += strlen(stages[stagei]);
     written = _min(written, max);
   }
-  else { written = re_utoa2(num_bytes, out, 10, max, true); }
+  else { written = utoa2(num_bytes, out, 10, max, true); }
   return written;
 }
 
